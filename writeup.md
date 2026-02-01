@@ -32,3 +32,14 @@ utf-16与utf-32编码的字符串太长，计算负担更大
 `0b11000001, 0b11111111`
 
 二字节utf-8要求形如`0b110xxxxx, 0b10xxxxxx`，同时首字节不能为`0xc0`或`0xc1`
+
+## train_bpe_tinystories
+
+### a
+
+- 在pretokenize时用大约8G内存，merge时大约用1.5G
+- 最长的token是`"Ġaccomplishment"`，有意义
+
+### b
+
+`re.finditer`
