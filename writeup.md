@@ -42,4 +42,4 @@ utf-16与utf-32编码的字符串太长，计算负担更大
 
 ### b
 
-`re.finditer`
+- pretokenize过程中的正则表达式匹配

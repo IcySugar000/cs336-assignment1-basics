@@ -1,3 +1,3 @@
-from .main import Tokenizer
+from .main import Trainer
 
-__all__ = ["Tokenizer"]
+__all__ = ["Trainer"]
