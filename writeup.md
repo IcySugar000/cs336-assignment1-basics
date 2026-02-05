@@ -54,3 +54,23 @@ utf-16与utf-32编码的字符串太长，计算负担更大
 
 - 两者词表都主要由英文词构成，许多词有前导空格
 - owt有显著更多的nonsense词汇
+
+## tokenizer_experiments
+
+### a
+
+- TinyStories: 4.16
+- OpenWebText: 4.56
+
+### b
+
+压缩率下降到3.60
+
+### c
+
+- 9231250 bytes / second
+- 约1.1天
+
+### d
+
+多数词表的长度都在uint16范围内，且uint16是满足条件的足够小的类型，节省空间
