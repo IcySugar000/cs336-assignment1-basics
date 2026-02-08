@@ -1,4 +1,8 @@
+import math
 from functools import lru_cache
+
+import torch
+from einops import einsum
 
 
 @lru_cache
@@ -47,3 +51,20 @@ def gpt2_bytes_to_unicode() -> dict[int, str]:
     characters = [chr(n) for n in cs]
     d = dict(zip(bs, characters))
     return d
+
+
+def softmax(x: torch.Tensor, dim: int):
+    max_values, _ = torch.max(x, dim=dim, keepdim=True)
+    x_sub = x - max_values
+    exp_x = torch.exp(x_sub)
+    return exp_x / torch.sum(exp_x, dim=dim, keepdim=True)
+
+
+def scaled_dot_product_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, mask: torch.Tensor | None = None):
+    result = einsum(q, k, "batch ... query d_k, batch ... key d_k -> batch ... query key")
+    result /= math.sqrt(q.size(-1))
+    if mask is not None:
+        result = torch.where(mask, result, float("-inf"))
+    result = softmax(result, -1)
+    result = einsum(result, v, "batch ... query key, batch ... key d_v -> batch ... query d_v")
+    return result
