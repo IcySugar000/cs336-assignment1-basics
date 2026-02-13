@@ -1,8 +1,12 @@
+import os
 import math
+import random
+import typing
 from functools import lru_cache
 from collections.abc import Iterable
 
 import torch
+import numpy as np
 from einops import einsum
 
 
@@ -90,3 +94,34 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: flo
         for param in parameters:
             if param.grad is not None:
                 param.grad *= max_l2_norm / (l2 + eps)
+
+
+def get_batch(dataset: np.typing.NDArray, batch_size: int, context_length: int, device: str):
+    inputs = torch.empty((batch_size, context_length), dtype=torch.int, device=device)
+    targets = torch.empty_like(inputs)
+    idxs = [random.randint(0, dataset.size - context_length - 1) for _ in range(batch_size)]
+    for i, idx in enumerate(idxs):
+        inputs[i] = torch.from_numpy(dataset[idx : idx + context_length])
+        targets[i] = torch.from_numpy(dataset[idx + 1 : idx + context_length + 1])
+    return inputs, targets
+
+
+def save_checkpoint(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    iteration: int,
+    out: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
+):
+    data = {"model": model.state_dict(), "optimizer": optimizer.state_dict(), "iteration": iteration}
+    torch.save(data, out)
+
+
+def load_checkpoint(
+    src: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+) -> int:
+    data = torch.load(src)
+    model.load_state_dict(data["model"])
+    optimizer.load_state_dict(data["optimizer"])
+    return data["iteration"]

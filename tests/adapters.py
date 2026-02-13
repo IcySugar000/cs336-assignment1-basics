@@ -13,7 +13,15 @@ from cs336_basics.tokenizer import Trainer, Tokenizer
 from cs336_basics.modules import Linear, Embedding, RMSNorm, SwiGLU, RoPE, MultiheadSelfAttention, TransformerBlock
 from cs336_basics.model import TransformerLM
 from cs336_basics.training import cross_entropy, AdamW
-from cs336_basics.utils import softmax, scaled_dot_product_attention, cosine_schedule, gradient_clipping
+from cs336_basics.utils import (
+    softmax,
+    scaled_dot_product_attention,
+    cosine_schedule,
+    gradient_clipping,
+    get_batch,
+    save_checkpoint,
+    load_checkpoint,
+)
 
 
 def run_linear(
@@ -483,7 +491,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return get_batch(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -583,7 +591,7 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    return save_checkpoint(model, optimizer, iteration, out)
 
 
 def run_load_checkpoint(
@@ -604,7 +612,7 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return load_checkpoint(src, model, optimizer)
 
 
 def get_tokenizer(
@@ -657,5 +665,5 @@ def run_train_bpe(
                 representing that <token1> was merged with <token2>.
                 Merges are ordered by order of creation.
     """
-    tokenizer = Trainer(input_path, vocab_size, special_tokens)
+    tokenizer = Trainer(input_path, vocab_size, special_tokens, num_splits=1, num_processes=1)
     return tokenizer.vocab, tokenizer.merges

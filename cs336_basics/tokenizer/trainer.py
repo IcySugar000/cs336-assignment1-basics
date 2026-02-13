@@ -109,22 +109,26 @@ class Trainer:
         self.token_to_words = {}
 
         # 3. 并行切分文件内容，进行pretokenize
-        with multiprocessing.Pool(processes=num_processes) as pool:
+        def chunk_generator():
+            with open(input_path, "rb") as f:
+                boundaries = find_chunk_boundaries(f, num_splits, splitter.encode())
 
-            def chunk_generator():
-                with open(input_path, "rb") as f:
-                    boundaries = find_chunk_boundaries(f, num_splits, splitter.encode())
+                # The following is a serial implementation, but you can parallelize this
+                # by sending each start/end pair to a set of processes.
+                for start, end in zip(boundaries[:-1], boundaries[1:]):
+                    logger.info(f"Sending pretokenizing file: {start} - {end} / {boundaries[-1]}")
+                    f.seek(start)
+                    yield f.read(end - start).decode("utf-8", errors="ignore")
 
-                    # The following is a serial implementation, but you can parallelize this
-                    # by sending each start/end pair to a set of processes.
-                    for start, end in zip(boundaries[:-1], boundaries[1:]):
-                        logger.info(f"Sending pretokenizing file: {start} - {end} / {boundaries[-1]}")
-                        f.seek(start)
-                        yield f.read(end - start).decode("utf-8", errors="ignore")
-
-            pretokenize_func = partial(self.pretokenize, special_tokens=special_tokens)
-            for i, result in enumerate(pool.imap_unordered(pretokenize_func, chunk_generator())):
-                self.merge_words(result)
+        if num_processes > 1:
+            with multiprocessing.Pool(processes=num_processes) as pool:
+                pretokenize_func = partial(self.pretokenize, special_tokens=special_tokens)
+                for i, result in enumerate(pool.imap_unordered(pretokenize_func, chunk_generator())):
+                    self.merge_words(result)
+                    logger.info(f"Pretokenizing process: {i + 1} / {num_splits}")
+        else:
+            for i, chunk in enumerate(chunk_generator()):
+                self.merge_words(self.pretokenize(chunk, special_tokens))
                 logger.info(f"Pretokenizing process: {i + 1} / {num_splits}")
 
         # 4. 合并
