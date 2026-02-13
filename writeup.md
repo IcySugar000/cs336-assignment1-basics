@@ -75,6 +75,8 @@ utf-16与utf-32编码的字符串太长，计算负担更大
 
 多数词表的长度都在uint16范围内，且uint16是满足条件的足够小的类型，节省空间
 
+# 3. Transformer Language Model Architecture
+
 ## transformer_accounting
 
 ### a
@@ -133,3 +135,72 @@ FFN
 |       |         | FFN | 644.2G | 22% |
 
 MHA对FLOPs的贡献大幅上升，而FFN大幅缩小
+
+# 4. Training a Transformer LM
+
+## learning_rate_tuning
+
+- 在lr=1, 10, 100时，loss逐渐下降，且lr越大loss下降越快
+- 在lr=1000时，loss一开始下降到很低，然后逐渐上升
+
+## adamwAccounting
+
+### a
+
+- V = vocab_size
+- L = context_length
+- d = d_model
+- N = num_layers
+- H = num_heads
+
+Parameters:
+- MHA: $4Nd^2$
+- FFN: $4Nd\times\text{d\_ff} = 12Nd^2$
+- RMSNorm: $(2N+1)d$
+- Embedding: $2Vd$
+- Total: $16Nd^2 + (2N+2V+1)d$
+- Total(mem): $64Nd^2 + (8N+8V+4)d$
+
+Activations:
+- RMSNorm: $(2N+1)BLd$
+- QKV: $3NBLd$
+- Q(T)K: $NBHL^2$
+- softmax: $NBHL^2$
+- Attn-V: $NBLd$
+- output-proj: $NBLd$
+- FFN: $4NBLd + 4NBLd + 4NBLd + 4NBLd + NBLd = 17NBLd$
+- Embedding: $BLd$
+- logits: $BLV$
+- Total: $(24N+2)BLd + 2NBHL^2 + BLV$
+- Total(mem): $(96N+8)BLd + 8NBHL^2 + 4BLV$
+
+Gradients:
+- Total: $16Nd^2 + (2N+2V+1)d$
+- Total(mem): $64Nd^2 + (8N+8V+4)d$
+
+Optimizer State:
+- Total: $32Nd^2 + (4N+4V+2)d$
+- Total(mem): $128Nd^2 + (16N+16V+8)d$
+
+Total:
+- Params: $256Nd^2 + (32N+32V+16)d + (96N+8)BLd + 8NBHL^2 + 4BLV$
+
+### b
+
+$17835036672B + 34032921600$
+
+2.98 -> 2
+
+### c
+
+$14(16Nd^2 + (2N+2V+1)d)$
+
+AdamW每个参数有14个FLOP，乘以总参数量即可
+
+### d
+
+- Forward: 4.34TFLOPs
+- Backward: 8.68TFLOPs
+- AdamW(per step): 0.027TFLOPs(忽略)
+
+$400000\times1024\times13.02\div(19.5\times0.5)\div(3600\times24) \approx 6331$ 天

@@ -1,5 +1,6 @@
 import math
 from functools import lru_cache
+from collections.abc import Iterable
 
 import torch
 from einops import einsum
@@ -68,3 +69,24 @@ def scaled_dot_product_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tens
     result = softmax(result, -1)
     result = einsum(result, v, "batch ... query key, batch ... key d_v -> batch ... query d_v")
     return result
+
+
+def cosine_schedule(
+    it: int, max_learning_rate: float, min_learning_rate: float, warmup_iters: int, cosine_cycle_iters: int
+):
+    if it < warmup_iters:
+        return max_learning_rate * it / warmup_iters
+    elif warmup_iters <= it <= cosine_cycle_iters:
+        return min_learning_rate + 0.5 * (
+            1 + math.cos(math.pi * (it - warmup_iters) / (cosine_cycle_iters - warmup_iters))
+        ) * (max_learning_rate - min_learning_rate)
+    else:
+        return min_learning_rate
+
+
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float, eps: float = 1e-6) -> None:
+    l2 = math.sqrt(sum([param.grad.norm(p=2) ** 2 for param in parameters if param.grad is not None]))
+    if l2 > max_l2_norm:
+        for param in parameters:
+            if param.grad is not None:
+                param.grad *= max_l2_norm / (l2 + eps)
