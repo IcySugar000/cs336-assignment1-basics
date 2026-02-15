@@ -18,18 +18,19 @@ def tokenize_dataset(dataset: Literal["TinyStories", "owt"], num_chunks: int = 6
 
     results = np.array([], dtype=np.uint16)
 
-    with open(f"data/{dataset}_train.txt", "rb") as f:
-        boundaries = find_chunk_boundaries(f, num_chunks, splitter.encode())
+    for dataset_type in ["train", "valid"]:
+        with open(f"data/{dataset}_{dataset_type}.txt", "rb") as f:
+            boundaries = find_chunk_boundaries(f, num_chunks, splitter.encode())
 
-        # The following is a serial implementation, but you can parallelize this
-        # by sending each start/end pair to a set of processes.
-        for start, end in zip(boundaries[:-1], boundaries[1:]):
-            logger.info(f"Tokenizing file: {start} - {end} / {boundaries[-1]}")
-            f.seek(start)
-            chunk = f.read(end - start).decode("utf-8", errors="ignore")
-            new_data = np.array(tokenizer.encode(chunk), dtype=np.uint16)
-            results = np.concatenate([results, new_data])
-    np.save(f"checkpoints/tokenizer/{dataset}_encoded.npy", results)
+            # The following is a serial implementation, but you can parallelize this
+            # by sending each start/end pair to a set of processes.
+            for start, end in zip(boundaries[:-1], boundaries[1:]):
+                logger.info(f"Tokenizing file: {start} - {end} / {boundaries[-1]}")
+                f.seek(start)
+                chunk = f.read(end - start).decode("utf-8", errors="ignore")
+                new_data = np.array(tokenizer.encode(chunk), dtype=np.uint16)
+                results = np.concatenate([results, new_data])
+        np.save(f"checkpoints/tokenizer/{dataset}_{dataset_type}_encoded.npy", results)
 
 
 def scalene_tokenizer():

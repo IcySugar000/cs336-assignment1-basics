@@ -6,11 +6,12 @@ import typing
 import torch
 import numpy as np
 from loguru import logger
+from einops import rearrange
 
-from .tokenizer import Tokenizer
-from .model import TransformerLM
-from .training import AdamW, cross_entropy, CosineScheduleParams, perplexity
-from .utils import save_checkpoint, load_checkpoint, get_batch, softmax
+from cs336_basics.tokenizer import Tokenizer
+from cs336_basics.model import TransformerLM
+from cs336_basics.training import AdamW, cross_entropy, CosineScheduleParams, perplexity
+from cs336_basics.utils import save_checkpoint, load_checkpoint, get_batch, softmax
 
 
 def training_loop(
@@ -68,6 +69,8 @@ def training_loop(
         start = time.perf_counter()
         batch_inputs, batch_targets = get_batch(training_data, batch_size, context_length, device)
         batch_actuals = model.forward(batch_inputs)
+        batch_actuals = rearrange(batch_actuals, "batch seq vocab -> (batch seq) vocab")
+        batch_targets = rearrange(batch_targets, "batch seq -> (batch seq)")
         losses = cross_entropy(batch_actuals, batch_targets)
 
         optimizer.zero_grad()
@@ -77,12 +80,15 @@ def training_loop(
         time_used = time.perf_counter() - start
         logger.info(f"Step {step} training loss: {losses.item()}, time used: {time_used:.3f}")
 
-        if step % 500 == 0 or step == steps:
+        if step % 100 == 0 or step == steps:
             # Validation
             model.eval()
             validation_inputs, validation_targets = get_batch(validation_data, batch_size, context_length, device)
+            validation_targets = rearrange(validation_targets, "batch seq -> (batch seq)")
             with torch.no_grad():
-                losses = cross_entropy(validation_inputs, validation_targets)
+                validation_actuals = model.forward(validation_inputs)
+                validation_actuals = rearrange(validation_actuals, "batch seq vocab -> (batch seq) vocab")
+                losses = cross_entropy(validation_actuals, validation_targets)
                 logger.info(f"Validation loss: {losses.item()}, perplexity: {perplexity(losses)}")
             model.train()
 
@@ -132,3 +138,19 @@ def generate(
     tokens_id: list[int] = tokens.tolist()
     result = tokenizer.decode(tokens_id)
     return result
+
+
+if __name__ == "__main__":
+    training_loop(
+        10000,
+        256,
+        4,
+        512,
+        16,
+        1344,
+        10000,
+        32,
+        5000,
+        "checkpoints/tokenizer/TinyStories_train_encoded.npy",
+        "checkpoints/tokenizer/TinyStories_valid_encoded.npy",
+    )

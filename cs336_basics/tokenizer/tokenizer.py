@@ -60,7 +60,7 @@ class Tokenizer:
         with open(vocab_filepath) as f:
             vocab_data = json.load(f)
         vocab = {v: k.encode("latin1") for k, v in vocab_data.items()}
-        with open(merges_filepath) as f:
+        with open(merges_filepath, encoding="utf-8") as f:
             merges_data = f.readlines()
         merges: list[tuple[bytes, bytes]] = []
         for line in merges_data:
