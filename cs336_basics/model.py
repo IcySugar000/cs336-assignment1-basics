@@ -23,6 +23,7 @@ class TransformerLM(torch.nn.Module):
         )
         self.norm = RMSNorm(d_model, device=device)
         self.linear = Linear(d_model, vocab_size)
+        self.to(device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.embedding.forward(x)

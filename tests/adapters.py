@@ -12,11 +12,10 @@ from torch import Tensor
 from cs336_basics.tokenizer import Trainer, Tokenizer
 from cs336_basics.modules import Linear, Embedding, RMSNorm, SwiGLU, RoPE, MultiheadSelfAttention, TransformerBlock
 from cs336_basics.model import TransformerLM
-from cs336_basics.training import cross_entropy, AdamW
+from cs336_basics.training import cross_entropy, cosine_schedule, AdamW
 from cs336_basics.utils import (
     softmax,
     scaled_dot_product_attention,
-    cosine_schedule,
     gradient_clipping,
     get_batch,
     save_checkpoint,
