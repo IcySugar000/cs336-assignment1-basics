@@ -33,6 +33,10 @@ def training_loop(
     opti_eps: float = 1e-8,
     load_from: str | os.PathLike | typing.BinaryIO | typing.IO[bytes] | None = None,
     save_to: str = "checkpoints/model",
+    vocab_filepath: str = "checkpoints/tokenizer/TinyStories_vocab.json",
+    merges_filepath: str = "checkpoints/tokenizer/TinyStories_merges.txt",
+    special_tokens: list[str] | None = ["<|endoftext|>"],
+    stop_token: str = "<|endoftext|>",
     device: str = "cpu",
 ):
     # 1. Init
@@ -80,7 +84,7 @@ def training_loop(
         time_used = time.perf_counter() - start
         logger.info(f"Step {step} training loss: {losses.item()}, time used: {time_used:.3f}")
 
-        if step % 100 == 0 or step == steps:
+        if step % 10 == 0 or step == steps:
             # Validation
             model.eval()
             validation_inputs, validation_targets = get_batch(validation_data, batch_size, context_length, device)
@@ -99,6 +103,19 @@ def training_loop(
                 os.makedirs(filedir)
             save_checkpoint(model, optimizer, step, filepath)
 
+            # Short generation sample
+            story = generate(
+                prompt="Once upon a time,",
+                model=model,
+                max_length=256,
+                vocab_filepath=vocab_filepath,
+                merges_filepath=merges_filepath,
+                special_tokens=special_tokens,
+                stop_token=stop_token,
+                device=device,
+            )
+            logger.info(f"Generation Sample: {story}")
+
 
 def generate(
     prompt: str,
@@ -109,30 +126,30 @@ def generate(
     special_tokens: list[str] | None = None,
     stop_token: str = "<|endoftext|>",
     temp: float = 1.0,
-    top_p: float = 0.0,
+    top_p: float = 1.0,
     device: str | None = None,
 ) -> str:
     tokenizer = Tokenizer.from_files(vocab_filepath, merges_filepath, special_tokens)
     tokens_list = tokenizer.encode(prompt)
     tokens = torch.tensor(tokens_list, dtype=torch.int, device=device)
     for _ in range(max_length):
-        logits = model.forward(tokens)
-        prob = softmax(logits, 0, temp)
+        logits = model.forward(rearrange(tokens, "seq -> 1 seq"))
+        prob = softmax(logits, -1, temp)
 
-        prob_list: list[float] = prob.tolist()
+        prob_list: list[float] = prob[0, -1, :].tolist()
         prob_id: dict[int, float] = {i: p for i, p in enumerate(prob_list)}
         prob_sorted = sorted(prob_id.items(), key=lambda x: x[1])
         prob_sum = 0.0
         cleaned_prob, cleand_id = [], []
-        while prob_sum < top_p:
+        while prob_sum < top_p and prob_sorted:
             i, p = prob_sorted.pop()
             cleaned_prob.append(p)
             cleand_id.append(i)
             prob_sum += p
         cleaned_prob = [p / prob_sum for p in cleaned_prob]
         next_token_id = random.choices(cleand_id, weights=cleaned_prob)[0]
-        tokens = torch.cat([tokens, torch.tensor([next_token_id], tokens.dtype, tokens.device)])
-        if tokenizer.vocab[next_token_id].decode() == stop_token:
+        tokens = torch.cat([tokens, torch.tensor([next_token_id], dtype=tokens.dtype, device=tokens.device)])
+        if tokenizer.vocab[next_token_id].decode(errors="replace") == stop_token:
             break
 
     tokens_id: list[int] = tokens.tolist()

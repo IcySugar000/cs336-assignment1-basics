@@ -37,7 +37,7 @@ class MultiheadSelfAttention(torch.nn.Module):
             q = self.rope.forward(q, token_positions)
             k = self.rope.forward(k, token_positions)
 
-        mask = torch.tril(torch.ones(x.size(-2), x.size(-2), dtype=torch.bool))
+        mask = torch.tril(torch.ones(x.size(-2), x.size(-2), dtype=torch.bool, device=w_q.device))
         heads = scaled_dot_product_attention(q, k, v, mask)
         multihead = rearrange(heads, "... head seq d_v -> ... seq (head d_v)")
         return einsum(self.w_o, multihead, "d_model hd_v, ... seq hd_v -> ... seq d_model")
