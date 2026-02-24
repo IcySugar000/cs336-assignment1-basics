@@ -1,5 +1,4 @@
 import os
-import time
 import random
 import typing
 
@@ -11,7 +10,16 @@ from einops import rearrange
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.model import TransformerLM
 from cs336_basics.training import AdamW, cross_entropy, CosineScheduleParams, perplexity
-from cs336_basics.utils import save_checkpoint, load_checkpoint, get_batch, softmax
+from cs336_basics.utils import save_checkpoint, load_checkpoint, get_batch, softmax, gradient_clipping
+from cs336_basics.exp_logger import ExpLogger
+
+
+def reset_seed(seed: int = 0):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def training_loop(
@@ -37,6 +45,7 @@ def training_loop(
     merges_filepath: str = "checkpoints/tokenizer/TinyStories_merges.txt",
     special_tokens: list[str] | None = ["<|endoftext|>"],
     stop_token: str = "<|endoftext|>",
+    exp_logger: ExpLogger | None = None,
     device: str = "cpu",
 ):
     # 1. Init
@@ -62,6 +71,9 @@ def training_loop(
     iteration = 1
     if load_from:
         iteration = load_checkpoint(src=load_from, model=model, optimizer=optimizer) + 1
+        reset_seed(iteration - 1)
+        if exp_logger:
+            exp_logger.load()
     optimizer.set_iter_from(iteration)
 
     training_data = np.load(train_data_path, "r")
@@ -70,21 +82,22 @@ def training_loop(
     # 2. Training
     model.train()
     for step in range(iteration, steps + 1):
-        start = time.perf_counter()
         batch_inputs, batch_targets = get_batch(training_data, batch_size, context_length, device)
         batch_actuals = model.forward(batch_inputs)
         batch_actuals = rearrange(batch_actuals, "batch seq vocab -> (batch seq) vocab")
         batch_targets = rearrange(batch_targets, "batch seq -> (batch seq)")
         losses = cross_entropy(batch_actuals, batch_targets)
+        gradient_clipping(model.parameters(), 1.0)
 
         optimizer.zero_grad()
         losses.backward()
         optimizer.step()
 
-        time_used = time.perf_counter() - start
-        logger.info(f"Step {step} training loss: {losses.item()}, time used: {time_used:.3f}")
+        logger.info(f"Step {step} training loss: {losses.item()}")
+        if exp_logger:
+            exp_logger.log(step, {"loss": losses.item()})
 
-        if step % 10 == 0 or step == steps:
+        if step % 1600 == 0 or step == steps:
             # Validation
             model.eval()
             validation_inputs, validation_targets = get_batch(validation_data, batch_size, context_length, device)
@@ -115,6 +128,10 @@ def training_loop(
                 device=device,
             )
             logger.info(f"Generation Sample: {story}")
+            if exp_logger:
+                exp_logger.save()
+
+            reset_seed(step)
 
 
 def generate(
@@ -149,7 +166,7 @@ def generate(
         cleaned_prob = [p / prob_sum for p in cleaned_prob]
         next_token_id = random.choices(cleand_id, weights=cleaned_prob)[0]
         tokens = torch.cat([tokens, torch.tensor([next_token_id], dtype=tokens.dtype, device=tokens.device)])
-        if tokenizer.vocab[next_token_id].decode(errors="replace") == stop_token:
+        if tokens.size(dim=0) >= max_length or tokenizer.vocab[next_token_id].decode(errors="replace") == stop_token:
             break
 
     tokens_id: list[int] = tokens.tolist()
@@ -158,6 +175,14 @@ def generate(
 
 
 if __name__ == "__main__":
+    reset_seed()
+    exp_logger = ExpLogger("base")
+
+    lr = 0.0001
+    lr_schedule = CosineScheduleParams(
+        max_learning_rate=lr, min_learning_rate=0, warmup_iters=1000, cosine_cycle_iters=25600
+    )
+
     training_loop(
         10000,
         256,
@@ -166,8 +191,11 @@ if __name__ == "__main__":
         16,
         1344,
         10000,
-        32,
-        5000,
+        50,
+        25600,
         "checkpoints/tokenizer/TinyStories_train_encoded.npy",
         "checkpoints/tokenizer/TinyStories_valid_encoded.npy",
+        lr_scheduling_params=lr_schedule,
+        exp_logger=exp_logger,
+        device="cuda:0",
     )

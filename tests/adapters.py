@@ -8,6 +8,7 @@ import numpy.typing as npt
 import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
+from einops import rearrange
 
 from cs336_basics.tokenizer import Trainer, Tokenizer
 from cs336_basics.modules import Linear, Embedding, RMSNorm, SwiGLU, RoPE, MultiheadSelfAttention, TransformerBlock
@@ -159,10 +160,10 @@ def run_multihead_self_attention(
     attn = MultiheadSelfAttention(d_model, num_heads)
     attn.load_state_dict(
         {
-            "w_q": q_proj_weight,
-            "w_k": k_proj_weight,
-            "w_v": v_proj_weight,
-            "w_o": o_proj_weight,
+            "qkv.w": rearrange(
+                [q_proj_weight, k_proj_weight, v_proj_weight], "three d_k d_in -> (three d_k) d_in", three=3
+            ),
+            "o.w": o_proj_weight,
         }
     )
     return attn.forward(in_features)
@@ -210,10 +211,10 @@ def run_multihead_self_attention_with_rope(
     attn = MultiheadSelfAttention(d_model, num_heads, rope=rope)
     attn.load_state_dict(
         {
-            "w_q": q_proj_weight,
-            "w_k": k_proj_weight,
-            "w_v": v_proj_weight,
-            "w_o": o_proj_weight,
+            "qkv.w": rearrange(
+                [q_proj_weight, k_proj_weight, v_proj_weight], "three d_k d_in -> (three d_k) d_in", three=3
+            ),
+            "o.w": o_proj_weight,
         }
     )
     return attn.forward(in_features, token_positions=token_positions)
@@ -313,10 +314,17 @@ def run_transformer_block(
         running the Transformer block on the input features while using RoPE.
     """
     block = TransformerBlock(d_model, num_heads, d_ff, theta=theta, max_seq_len=max_seq_len)
-    block.mha.w_q = torch.nn.Parameter(weights["attn.q_proj.weight"])
-    block.mha.w_k = torch.nn.Parameter(weights["attn.k_proj.weight"])
-    block.mha.w_v = torch.nn.Parameter(weights["attn.v_proj.weight"])
-    block.mha.w_o = torch.nn.Parameter(weights["attn.output_proj.weight"])
+    qkv_w = rearrange(
+        [
+            weights["attn.q_proj.weight"],
+            weights["attn.k_proj.weight"],
+            weights["attn.v_proj.weight"],
+        ],
+        "three d_k d_in -> (three d_k) d_in",
+        three=3,
+    )
+    block.mha.qkv.w.data = qkv_w
+    block.mha.o.w.data = weights["attn.output_proj.weight"]
     block.norm1.g = torch.nn.Parameter(weights["ln1.weight"])
     block.norm2.g = torch.nn.Parameter(weights["ln2.weight"])
     block.ffn.w1_weight = torch.nn.Parameter(weights["ffn.w1.weight"])
@@ -416,10 +424,17 @@ def run_transformer_lm(
     lm.embedding.w = torch.nn.Parameter(weights["token_embeddings.weight"])
     for i in range(num_layers):
         block = cast(TransformerBlock, lm.transformer_blocks[i])
-        block.mha.w_q = torch.nn.Parameter(weights[f"layers.{i}.attn.q_proj.weight"])
-        block.mha.w_k = torch.nn.Parameter(weights[f"layers.{i}.attn.k_proj.weight"])
-        block.mha.w_v = torch.nn.Parameter(weights[f"layers.{i}.attn.v_proj.weight"])
-        block.mha.w_o = torch.nn.Parameter(weights[f"layers.{i}.attn.output_proj.weight"])
+        qkv_w = rearrange(
+            [
+                weights[f"layers.{i}.attn.q_proj.weight"],
+                weights[f"layers.{i}.attn.k_proj.weight"],
+                weights[f"layers.{i}.attn.v_proj.weight"],
+            ],
+            "three d_k d_in -> (three d_k) d_in",
+            three=3,
+        )
+        block.mha.qkv.w.data = qkv_w
+        block.mha.o.w.data = weights[f"layers.{i}.attn.output_proj.weight"]
         block.norm1.g = torch.nn.Parameter(weights[f"layers.{i}.ln1.weight"])
         block.norm2.g = torch.nn.Parameter(weights[f"layers.{i}.ln2.weight"])
         block.ffn.w1_weight = torch.nn.Parameter(weights[f"layers.{i}.ffn.w1.weight"])
