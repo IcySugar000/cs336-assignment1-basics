@@ -87,10 +87,10 @@ def training_loop(
         batch_actuals = rearrange(batch_actuals, "batch seq vocab -> (batch seq) vocab")
         batch_targets = rearrange(batch_targets, "batch seq -> (batch seq)")
         losses = cross_entropy(batch_actuals, batch_targets)
-        gradient_clipping(model.parameters(), 1.0)
 
         optimizer.zero_grad()
         losses.backward()
+        gradient_clipping(model.parameters(), 1.0)
         optimizer.step()
 
         logger.info(f"Step {step} training loss: {losses.item()}")

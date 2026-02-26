@@ -1,5 +1,5 @@
 import torch
-from einops import rearrange, einsum
+from einops import rearrange
 
 from .rope import RoPE
 from .linear import Linear
@@ -21,25 +21,10 @@ class MultiheadSelfAttention(torch.nn.Module):
         self.d_k = d_model // num_heads
         self.d_v = self.d_k
 
-        # self.w_q = torch.nn.Parameter(torch.rand(num_heads * self.d_k, d_model, device=device))
-        # self.w_k = torch.nn.Parameter(torch.rand(num_heads * self.d_k, d_model, device=device))
-        # self.w_v = torch.nn.Parameter(torch.rand(num_heads * self.d_v, d_model, device=device))
-        # self.w_o = torch.nn.Parameter(torch.rand(d_model, num_heads * self.d_v, device=device))
-
         self.qkv = Linear(d_model, 3 * (num_heads * self.d_k), device=device)
         self.o = Linear(num_heads * self.d_v, d_model, device=device)
 
-        # heads*dk, 3dm ->
-        # batch seq dm -> batch seq 3head*dk -> 3 batch head seq dk
-
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor | None = None) -> torch.Tensor:
-        # w_q = rearrange(self.w_q, "(head dk) dm -> head dk dm", head=self.num_heads)
-        # w_k = rearrange(self.w_k, "(head dk) dm -> head dk dm", head=self.num_heads)
-        # w_v = rearrange(self.w_v, "(head dv) dm -> head dv dm", head=self.num_heads)
-        # q = einsum(w_q, x, "head dk dm, ... seq dm -> ... head seq dk")
-        # k = einsum(w_k, x, "head dk dm, ... seq dm -> ... head seq dk")
-        # v = einsum(w_v, x, "head dv dm, ... seq dm -> ... head seq dv")
-
         qkv_projected = self.qkv.forward(x)
         q, k, v = rearrange(
             qkv_projected, "... seq (three head dk) -> three ... head seq dk", three=3, head=self.num_heads

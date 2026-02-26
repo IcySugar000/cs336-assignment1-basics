@@ -101,7 +101,7 @@ def run_swiglu(
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
     swiglu = SwiGLU(d_model, d_ff)
-    swiglu.load_state_dict({"w1_weight": w1_weight, "w2_weight": w2_weight, "w3_weight": w3_weight})
+    swiglu.load_state_dict({"w1.w": w1_weight, "w2.w": w2_weight, "w3.w": w3_weight})
     return swiglu.forward(in_features)
 
 
@@ -327,9 +327,9 @@ def run_transformer_block(
     block.mha.o.w.data = weights["attn.output_proj.weight"]
     block.norm1.g = torch.nn.Parameter(weights["ln1.weight"])
     block.norm2.g = torch.nn.Parameter(weights["ln2.weight"])
-    block.ffn.w1_weight = torch.nn.Parameter(weights["ffn.w1.weight"])
-    block.ffn.w2_weight = torch.nn.Parameter(weights["ffn.w2.weight"])
-    block.ffn.w3_weight = torch.nn.Parameter(weights["ffn.w3.weight"])
+    block.ffn.w1.w = torch.nn.Parameter(weights["ffn.w1.weight"])
+    block.ffn.w2.w = torch.nn.Parameter(weights["ffn.w2.weight"])
+    block.ffn.w3.w = torch.nn.Parameter(weights["ffn.w3.weight"])
     return block.forward(in_features)
 
 
@@ -437,9 +437,9 @@ def run_transformer_lm(
         block.mha.o.w.data = weights[f"layers.{i}.attn.output_proj.weight"]
         block.norm1.g = torch.nn.Parameter(weights[f"layers.{i}.ln1.weight"])
         block.norm2.g = torch.nn.Parameter(weights[f"layers.{i}.ln2.weight"])
-        block.ffn.w1_weight = torch.nn.Parameter(weights[f"layers.{i}.ffn.w1.weight"])
-        block.ffn.w2_weight = torch.nn.Parameter(weights[f"layers.{i}.ffn.w2.weight"])
-        block.ffn.w3_weight = torch.nn.Parameter(weights[f"layers.{i}.ffn.w3.weight"])
+        block.ffn.w1.w = torch.nn.Parameter(weights[f"layers.{i}.ffn.w1.weight"])
+        block.ffn.w2.w = torch.nn.Parameter(weights[f"layers.{i}.ffn.w2.weight"])
+        block.ffn.w3.w = torch.nn.Parameter(weights[f"layers.{i}.ffn.w3.weight"])
     lm.norm.g = torch.nn.Parameter(weights["ln_final.weight"])
     lm.linear.w = torch.nn.Parameter(weights["lm_head.weight"])
     return lm.forward(in_indices)
