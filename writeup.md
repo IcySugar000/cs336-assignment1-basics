@@ -204,3 +204,47 @@ AdamW每个参数有14个FLOP，乘以总参数量即可
 - AdamW(per step): 0.027TFLOPs(忽略)
 
 $400000\times1024\times13.02\div(19.5\times0.5)\div(3600\times24) \approx 6331$ 天
+
+
+# 7. Experiments
+
+## learning_rate
+
+![batch64, loss-lr](figs/lr.png)
+
+### a
+
+考察了`lr=[1e-2, 1e-3, 1e-4, 1e-5]`的情况
+
+其中`lr=1e-3`时表现最好，最终loss来到了1.36，小于要求的1.45
+
+### b
+
+观察到loss逐渐上升至1e-2时开始难以收敛，最优的lr出现在比他小一点的1e-3时
+
+## batch_size_experiment
+
+![lr1e-3, loss-batch](figs/batch.png)
+
+测试了`batch = 1, 16, 64(base), 128, 512`的情况
+
+由于需要保持总token数不变，因此各次实验steps数不同，此处统一归一化
+
+由于噪声较大，作图时间隔采样数据点
+
+可以看出：
+
+- batch越大，训练越稳定
+- batch越大，整体下降速度越缓
+- 在总token数不变的情况下，最优的batch数为`16`，此时loss进一步下降到1.30，但总体batch带来的差异不大
+
+## generate
+
+来自`batch=16, lr=1e-3`
+
+```text
+Once upon a time, there was a jolly boy named Tim. Tim liked to play with his ball in the park. One day, Tim saw a big net near a tree. It was a sunny day and Tim wanted to play catch with the net.
+Tim went to the net and tried to hit it with his foot. He was very good at it! He looked at the net and saw that it was stuck. So, Tim had an idea. He would use his net to strike the net with his foot.
+Tim tried again and hit the net. Each time, he missed! But Tim was so jolly. He hit the net again and again, laughing and having fun. Finally, he hit the net again, and this time, he hit it to the same time. Tim was so happy because he learned to be more careful when letting go to the ball.
+<|endoftext|>
+```

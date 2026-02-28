@@ -167,3 +167,4 @@ data/
 checkpoints/model/
 checkpoints/exp_logger/
 checkpoints/tokenizer/*_encoded.npy
+results/
