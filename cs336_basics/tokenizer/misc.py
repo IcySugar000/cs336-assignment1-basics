@@ -16,9 +16,8 @@ def tokenize_dataset(dataset: Literal["TinyStories", "owt"], num_chunks: int = 6
     tokenizer = Tokenizer.from_files(vocab_path, merges_path, special_tokens)
     splitter = "<|endoftext|>" if dataset == "TinyStories" else "\n"
 
-    results = np.array([], dtype=np.uint16)
-
     for dataset_type in ["train", "valid"]:
+        results = np.array([], dtype=np.uint16)
         with open(f"data/{dataset}_{dataset_type}.txt", "rb") as f:
             boundaries = find_chunk_boundaries(f, num_chunks, splitter.encode())
 
